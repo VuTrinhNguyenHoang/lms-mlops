@@ -9,6 +9,11 @@ from monitoring.prometheus import record_retrain_metrics
 from models.registry import register_model_version, set_champion_alias
 from models.train import train_and_log_candidates
 from rules.promotion import should_promote
+from storage.paths import (
+    evaluation_output_path,
+    merged_training_dataset_path,
+    retrain_output_path,
+)
 
 def _load_json(path: str) -> dict:
     return json.loads(Path(path).read_text(encoding="utf-8"))
@@ -49,7 +54,7 @@ def retrain_flow(
     truth_paths = [training_path]
 
     if output_path is None:
-        output_path = f"outputs/retrain/{batch_id}.json"
+        output_path = str(retrain_output_path(batch_id))
 
     if not evaluation.get("retrain_decision", False):
         summary = {
@@ -71,6 +76,9 @@ def retrain_flow(
         return summary
 
     reference_path = reference_path or str(REFERENCE_DATA_PATH)
+    merged_training_path = merged_training_path or str(
+        merged_training_dataset_path(batch_id)
+    )
     training_dataset = build_retrain_dataset(
         reference_path=reference_path,
         truth_paths=truth_paths,
@@ -145,6 +153,6 @@ if __name__ == "__main__":
     print(
         retrain_flow(
             training_path="simulated_data.csv",
-            evaluation_path="outputs/evaluations/demo-batch.json",
+            evaluation_path=str(evaluation_output_path("demo-batch")),
         )
     )

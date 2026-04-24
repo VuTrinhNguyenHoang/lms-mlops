@@ -2,7 +2,6 @@ from pathlib import Path
 
 import pandas as pd
 
-from core.config import LOCAL_MERGED_TRAINING_DIR
 from core.contracts import ID_COLUMNS, TRUTH_REQUIRED_COLUMNS
 from data.loading import load_csv, save_csv
 from data.validation import validate_truth_df
@@ -12,15 +11,11 @@ def _load_validated_truth(path: str):
     return validate_truth_df(load_csv(path))
 
 
-def _default_output_path(batch_id: str) -> Path:
-    return LOCAL_MERGED_TRAINING_DIR / f"{batch_id}.csv"
-
-
 def build_retrain_dataset(
     reference_path: str,
     truth_paths: list[str],
     batch_id: str,
-    output_path: str | None = None,
+    output_path: str,
 ) -> dict:
     if not truth_paths:
         raise ValueError("At least one truth path is required to build retrain dataset")
@@ -40,11 +35,7 @@ def build_retrain_dataset(
         .reset_index(drop=True)
     )
 
-    output_file = (
-        Path(output_path)
-        if output_path is not None
-        else _default_output_path(batch_id)
-    )
+    output_file = Path(output_path)
     output_file.parent.mkdir(parents=True, exist_ok=True)
     save_csv(merged_df, str(output_file))
 

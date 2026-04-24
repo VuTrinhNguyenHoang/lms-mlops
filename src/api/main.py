@@ -6,13 +6,18 @@ from fastapi.responses import FileResponse, Response
 
 from api.dependencies import trigger_deployment
 from core.config import (
-    LOCAL_OUTPUT_DIR,
-    LOCAL_STORAGE_DIR,
     PREFECT_EVALUATE_AND_RETRAIN_DEPLOYMENT,
     PREFECT_PREDICT_DEPLOYMENT,
     PREFECT_RETRAIN_DEPLOYMENT,
 )
 from monitoring.prometheus import render_metrics
+from storage.paths import (
+    evaluation_output_path,
+    prediction_output_path,
+    raw_prediction_path,
+    raw_truth_path,
+    retrain_output_path,
+)
 
 app = FastAPI(title="LMS MLOps API")
 
@@ -50,8 +55,8 @@ async def upload_prediction_batch(
     _ensure_csv(file)
 
     batch_id = batch_id or _new_batch_id()
-    input_path = LOCAL_STORAGE_DIR / "raw" / "prediction" / f"{batch_id}.csv"
-    output_path = LOCAL_OUTPUT_DIR / "predictions" / f"{batch_id}.csv"
+    input_path = raw_prediction_path(batch_id)
+    output_path = prediction_output_path(batch_id)
 
     await _save_upload(file, input_path)
 
@@ -79,10 +84,10 @@ async def upload_truth_batch(
 ):
     _ensure_csv(file)
 
-    truth_path = LOCAL_STORAGE_DIR / "raw" / "truth" / f"{batch_id}.csv"
-    prediction_path = LOCAL_OUTPUT_DIR / "predictions" / f"{batch_id}.csv"
-    evaluation_path = LOCAL_OUTPUT_DIR / "evaluations" / f"{batch_id}.json"
-    retrain_path = LOCAL_OUTPUT_DIR / "retrain" / f"{batch_id}.json"
+    truth_path = raw_truth_path(batch_id)
+    prediction_path = prediction_output_path(batch_id)
+    evaluation_path = evaluation_output_path(batch_id)
+    retrain_path = retrain_output_path(batch_id)
 
     await _save_upload(file, truth_path)
 
@@ -109,9 +114,9 @@ async def upload_truth_batch(
 
 @app.post("/batches/{batch_id}/retrain", status_code=status.HTTP_202_ACCEPTED)
 async def trigger_retrain(batch_id: str):
-    truth_path = LOCAL_STORAGE_DIR / "raw" / "truth" / f"{batch_id}.csv"
-    evaluation_path = LOCAL_OUTPUT_DIR / "evaluations" / f"{batch_id}.json"
-    retrain_path = LOCAL_OUTPUT_DIR / "retrain" / f"{batch_id}.json"
+    truth_path = raw_truth_path(batch_id)
+    evaluation_path = evaluation_output_path(batch_id)
+    retrain_path = retrain_output_path(batch_id)
 
     if not truth_path.exists():
         raise HTTPException(status_code=404, detail="Truth CSV not found")
@@ -139,7 +144,7 @@ async def trigger_retrain(batch_id: str):
 
 @app.get("/batches/{batch_id}/predictions")
 def get_prediction_output(batch_id: str):
-    path = LOCAL_OUTPUT_DIR / "predictions" / f"{batch_id}.csv"
+    path = prediction_output_path(batch_id)
 
     if not path.exists():
         raise HTTPException(status_code=404, detail="Prediction output not found")
@@ -148,7 +153,7 @@ def get_prediction_output(batch_id: str):
 
 @app.get("/batches/{batch_id}/evaluation")
 def get_evaluation_output(batch_id: str):
-    path = LOCAL_OUTPUT_DIR / "evaluations" / f"{batch_id}.json"
+    path = evaluation_output_path(batch_id)
 
     if not path.exists():
         raise HTTPException(status_code=404, detail="Evaluation output not found")
@@ -157,7 +162,7 @@ def get_evaluation_output(batch_id: str):
 
 @app.get("/batches/{batch_id}/retrain")
 def get_retrain_output(batch_id: str):
-    path = LOCAL_OUTPUT_DIR / "retrain" / f"{batch_id}.json"
+    path = retrain_output_path(batch_id)
 
     if not path.exists():
         raise HTTPException(status_code=404, detail="Retrain output not found")

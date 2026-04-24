@@ -3,7 +3,6 @@ from pathlib import Path
 
 from prefect import flow, get_run_logger
 
-from core.config import LOCAL_REPORT_DIR
 from core.contracts import ID_COLUMNS
 from data.loading import load_csv
 from data.validation import validate_prediction_output_df, validate_truth_df
@@ -11,6 +10,11 @@ from models.evaluate import evaluate_prediction_output
 from monitoring.prometheus import record_truth_metrics
 from rules.retrain import should_retrain
 from drift.performance_drift import compute_performance_drift
+from storage.paths import (
+    data_drift_summary_path,
+    evaluation_output_path,
+    prediction_output_path,
+)
 
 def _join_truth_and_predictions(truth_df, predictions_df, batch_id: str):
     batch_predictions = predictions_df[predictions_df["batch_id"] == batch_id].copy()
@@ -29,12 +33,8 @@ def _join_truth_and_predictions(truth_df, predictions_df, batch_id: str):
 
     return joined, batch_predictions
 
-def _data_drift_summary_path(batch_id: str) -> Path:
-    return LOCAL_REPORT_DIR / "evidently" / "data_drift" / f"{batch_id}.summary.json"
-
-
 def _load_data_drift_metrics(batch_id: str) -> tuple[dict | None, str | None]:
-    path = _data_drift_summary_path(batch_id)
+    path = data_drift_summary_path(batch_id)
 
     if not path.exists():
         return None, None
@@ -52,7 +52,7 @@ def evaluate_truth_flow(
     logger = get_run_logger()
 
     if output_path is None:
-        output_path = f"outputs/evaluations/{batch_id}.json"
+        output_path = str(evaluation_output_path(batch_id))
 
     logger.info("Evaluating truth for batch_id=%s", batch_id)
 
@@ -68,7 +68,7 @@ def evaluate_truth_flow(
     metrics = evaluate_prediction_output(joined_df)
     performance_drift = compute_performance_drift(metrics)
     matched_ratio = len(joined_df) / len(truth_df) if len(truth_df) else 0
-    data_drift, data_drift_summary_path = _load_data_drift_metrics(batch_id)
+    data_drift, data_drift_summary_file = _load_data_drift_metrics(batch_id)
 
     summary = {
         "batch_id": batch_id,
@@ -86,7 +86,7 @@ def evaluate_truth_flow(
 
     if data_drift is not None:
         summary["data_drift"] = data_drift
-        summary["data_drift_summary_path"] = data_drift_summary_path
+        summary["data_drift_summary_path"] = data_drift_summary_file
 
     retrain_decision, retrain_reasons = should_retrain(summary)
     summary["retrain_decision"] = retrain_decision
@@ -113,7 +113,7 @@ if __name__ == "__main__":
     print(
         evaluate_truth_flow(
             truth_path="simulated_data.csv",
-            prediction_path="outputs/predictions/demo-batch.csv",
+            prediction_path=str(prediction_output_path("demo-batch")),
             batch_id="demo-batch",
         )
     )

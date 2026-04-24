@@ -2,11 +2,17 @@ from pathlib import Path
 import json
 
 from prefect import flow, get_run_logger
-from core.config import LOCAL_REPORT_DIR, REFERENCE_DATA_PATH
+from core.config import REFERENCE_DATA_PATH
 from data.loading import save_csv, load_csv
 from drift.data_drift import compute_data_drift
 from monitoring.prometheus import record_prediction_metrics
 from models.predict import predict_with_champion
+from storage.paths import (
+    data_drift_html_path,
+    data_drift_json_path,
+    data_drift_summary_path,
+    prediction_output_path,
+)
 
 @flow(name="predict-batch", log_prints=True)
 def predict_batch_flow(
@@ -17,7 +23,7 @@ def predict_batch_flow(
     logger = get_run_logger()
 
     if output_path is None:
-        output_path = f"outputs/predictions/{batch_id}.csv"
+        output_path = str(prediction_output_path(batch_id))
 
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
 
@@ -38,15 +44,9 @@ def predict_batch_flow(
         batch_id=f"{batch_id}-reference",
     )
 
-    drift_html_path = (
-        LOCAL_REPORT_DIR / "evidently" / "data_drift" / f"{batch_id}.html"
-    )
-    drift_json_path = (
-        LOCAL_REPORT_DIR / "evidently" / "data_drift" / f"{batch_id}.json"
-    )
-    drift_summary_path = (
-        LOCAL_REPORT_DIR / "evidently" / "data_drift" / f"{batch_id}.summary.json"
-    )
+    drift_html_path = data_drift_html_path(batch_id)
+    drift_json_path = data_drift_json_path(batch_id)
+    drift_summary_path = data_drift_summary_path(batch_id)
 
     drift_metrics = compute_data_drift(
         reference_df=reference_df,

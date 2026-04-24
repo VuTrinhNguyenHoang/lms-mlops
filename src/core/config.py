@@ -37,3 +37,10 @@ PREFECT_TRAIN_DEPLOYMENT = "train-initial-champion/train-initial-champion"
 PREFECT_PREDICT_DEPLOYMENT = "predict-batch/predict-batch"
 PREFECT_TRUTH_DEPLOYMENT = "evaluate-truth/evaluate-truth"
 PREFECT_RETRAIN_DEPLOYMENT = "retrain-model/retrain-model"
+
+# Drift
+REFERENCE_DATA_PATH = PROJECT_ROOT / "simulated_data.csv"
+LOCAL_REPORT_DIR = LOCAL_OUTPUT_DIR / "reports"
+
+DATA_DRIFT_SHARE_THRESHOLD = 0.5
+PREDICTION_SCORE_DRIFT_THRESHOLD = 0.05

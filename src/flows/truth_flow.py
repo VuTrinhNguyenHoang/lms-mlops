@@ -8,6 +8,7 @@ from data.loading import load_csv
 from data.validation import validate_prediction_output_df, validate_truth_df
 from models.evaluate import evaluate_prediction_output
 from rules.retrain import should_retrain
+from drift.performance_drift import compute_performance_drift
 
 def _join_truth_and_predictions(truth_df, predictions_df, batch_id: str):
     batch_predictions = predictions_df[predictions_df["batch_id"] == batch_id].copy()
@@ -50,6 +51,7 @@ def evaluate_truth_flow(
     )
 
     metrics = evaluate_prediction_output(joined_df)
+    performance_drift = compute_performance_drift(metrics)
 
     summary = {
         "batch_id": batch_id,
@@ -61,6 +63,7 @@ def evaluate_truth_flow(
         "matched_rows": int(len(joined_df)),
         "unmatched_truth_rows": int(len(truth_df) - len(joined_df)),
         "metrics": metrics,
+        "performance_drift": performance_drift
     }
 
     retrain_decision, retrain_reasons = should_retrain(summary)

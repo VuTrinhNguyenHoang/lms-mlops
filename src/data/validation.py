@@ -1,6 +1,7 @@
 from core.contracts import (
     ID_COLUMNS,
     FEATURE_COLUMNS,
+    PREDICTION_OUTPUT_COLUMNS,
     TARGET_COLUMN,
     PREDICTION_REQUIRED_COLUMNS,
     TRUTH_REQUIRED_COLUMNS
@@ -29,6 +30,24 @@ def validate_truth_df(df):
         raise ValueError(f"Target must be binary 0/1. Invalid values: {invalid_targets}")
 
     return df[TRUTH_REQUIRED_COLUMNS].copy()
+
+def validate_prediction_output_df(df):
+    missing = _missing_columns(df, PREDICTION_OUTPUT_COLUMNS)
+    if missing:
+        raise ValueError(f"Prediction output missing columns: {missing}")
+
+    if df["risk_score"].isna().any():
+        raise ValueError("Prediction output contains missing risk_score")
+
+    invalid_scores = df[(df["risk_score"] < 0) | (df["risk_score"] > 1)]
+    if not invalid_scores.empty:
+        raise ValueError("risk_score must be between 0 and 1")
+
+    invalid_labels = set(df["predicted_label"].dropna().unique()) - {0, 1}
+    if invalid_labels:
+        raise ValueError(f"predicted_label must be binary 0/1. Invalid values: {invalid_labels}")
+
+    return df[PREDICTION_OUTPUT_COLUMNS].copy()
 
 def get_feature_target(df):
     X = df[FEATURE_COLUMNS].copy()

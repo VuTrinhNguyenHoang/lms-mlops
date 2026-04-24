@@ -7,6 +7,7 @@ from core.contracts import ID_COLUMNS
 from data.loading import load_csv
 from data.validation import validate_prediction_output_df, validate_truth_df
 from models.evaluate import evaluate_prediction_output
+from monitoring.prometheus import record_truth_metrics
 from rules.retrain import should_retrain
 from drift.performance_drift import compute_performance_drift
 
@@ -75,6 +76,7 @@ def evaluate_truth_flow(
         json.dumps(summary, indent=2),
         encoding="utf-8",
     )
+    record_truth_metrics(summary)
 
     logger.info(
         "Evaluation done for batch_id=%s: matched_rows=%s, f1_risk=%.4f, recall_risk=%.4f",

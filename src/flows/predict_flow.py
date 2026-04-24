@@ -5,6 +5,7 @@ from prefect import flow, get_run_logger
 from core.config import LOCAL_REPORT_DIR, REFERENCE_DATA_PATH
 from data.loading import save_csv, load_csv
 from drift.data_drift import compute_data_drift
+from monitoring.prometheus import record_prediction_metrics
 from models.predict import predict_with_champion
 
 @flow(name="predict-batch", log_prints=True)
@@ -81,7 +82,7 @@ def predict_batch_flow(
         model_version,
     )
 
-    return {
+    summary = {
         "batch_id": batch_id,
         "input_path": input_path,
         "output_path": output_path,
@@ -93,6 +94,9 @@ def predict_batch_flow(
         "drift_summary_path": str(drift_summary_path),
         "drift_metrics": drift_metrics,
     }
+
+    record_prediction_metrics(summary)
+    return summary
 
 
 if __name__ == "__main__":

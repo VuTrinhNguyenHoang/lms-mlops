@@ -3,6 +3,7 @@ from pathlib import Path
 
 from prefect import flow, get_run_logger
 
+from monitoring.prometheus import record_retrain_metrics
 from models.registry import register_model_version, set_champion_alias
 from models.train import train_and_log_candidates
 from rules.promotion import should_promote
@@ -57,6 +58,7 @@ def retrain_flow(
         }
 
         _write_json(summary, output_path)
+        record_retrain_metrics(summary)
         logger.info("Retrain skipped for batch_id=%s", batch_id)
         return summary
 
@@ -114,6 +116,7 @@ def retrain_flow(
     }
 
     _write_json(summary, output_path)
+    record_retrain_metrics(summary)
     return summary
 
 if __name__ == "__main__":

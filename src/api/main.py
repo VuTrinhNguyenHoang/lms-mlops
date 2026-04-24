@@ -2,7 +2,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 
 from api.dependencies import trigger_deployment
 from core.config import (
@@ -12,6 +12,7 @@ from core.config import (
     PREFECT_RETRAIN_DEPLOYMENT,
     PREFECT_TRUTH_DEPLOYMENT,
 )
+from monitoring.prometheus import render_metrics
 
 app = FastAPI(title="LMS MLOps API")
 
@@ -35,6 +36,11 @@ async def _save_upload(file: UploadFile, path: Path) -> None:
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+@app.get("/metrics", include_in_schema=False)
+def metrics():
+    content, media_type = render_metrics()
+    return Response(content=content, media_type=media_type)
 
 @app.post("/batches/prediction", status_code=status.HTTP_202_ACCEPTED)
 async def upload_prediction_batch(

@@ -1,16 +1,13 @@
 DEFAULT_RETRAIN_RULES = {
     "min_truth_rows": 50,
     "min_matched_ratio": 0.8,
-    "min_recall_risk": 0.75,
-    "min_f1_risk": 0.5,
-    "max_false_negative_count": 10,
+    "retrain_on_performance_drift": True,
+    "retrain_on_data_drift": True,
 }
 
 def should_retrain(evaluation_summary: dict, rules: dict | None = None) -> tuple[bool, list[str]]:
     rules = rules or DEFAULT_RETRAIN_RULES
     reasons = []
-
-    metrics = evaluation_summary["metrics"]
 
     truth_rows = evaluation_summary["truth_rows"]
     matched_rows = evaluation_summary["matched_rows"]
@@ -26,19 +23,18 @@ def should_retrain(evaluation_summary: dict, rules: dict | None = None) -> tuple
             f"matched_ratio={matched_ratio:.3f} < min_matched_ratio={rules['min_matched_ratio']}"
         ]
 
-    if metrics["recall_risk"] < rules["min_recall_risk"]:
-        reasons.append(
-            f"recall_risk={metrics['recall_risk']:.3f} < min_recall_risk={rules['min_recall_risk']}"
-        )
+    performance_drift = evaluation_summary.get("performance_drift", {})
+    if (
+        rules["retrain_on_performance_drift"]
+        and performance_drift.get("performance_drift_detected", False)
+    ):
+        reasons.extend(performance_drift.get("performance_drift_reasons", []))
 
-    if metrics["f1_risk"] < rules["min_f1_risk"]:
-        reasons.append(
-            f"f1_risk={metrics['f1_risk']:.3f} < min_f1_risk={rules['min_f1_risk']}"
-        )
-
-    if metrics["false_negative_count"] > rules["max_false_negative_count"]:
-        reasons.append(
-            f"false_negative_count={metrics['false_negative_count']} > max_false_negative_count={rules['max_false_negative_count']}"
-        )
+    data_drift = evaluation_summary.get("data_drift", {})
+    if (
+        rules["retrain_on_data_drift"]
+        and data_drift.get("data_drift_detected", False)
+    ):
+        reasons.append("data_drift_detected=True")
 
     return bool(reasons), reasons

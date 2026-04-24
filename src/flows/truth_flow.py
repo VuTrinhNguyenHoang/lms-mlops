@@ -7,6 +7,7 @@ from core.contracts import ID_COLUMNS
 from data.loading import load_csv
 from data.validation import validate_prediction_output_df, validate_truth_df
 from models.evaluate import evaluate_prediction_output
+from rules.retrain import should_retrain
 
 def _join_truth_and_predictions(truth_df, predictions_df, batch_id: str):
     batch_predictions = predictions_df[predictions_df["batch_id"] == batch_id].copy()
@@ -61,6 +62,10 @@ def evaluate_truth_flow(
         "unmatched_truth_rows": int(len(truth_df) - len(joined_df)),
         "metrics": metrics,
     }
+
+    retrain_decision, retrain_reasons = should_retrain(summary)
+    summary["retrain_decision"] = retrain_decision
+    summary["retrain_reasons"] = retrain_reasons
 
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
     Path(output_path).write_text(

@@ -173,6 +173,16 @@ def render_metrics() -> tuple[bytes, str]:
         "Latest false negative count.",
         registry=registry,
     )
+    matched_ratio = Gauge(
+        "lms_matched_ratio",
+        "Latest ratio of truth rows matched to prediction rows.",
+        registry=registry,
+    )
+    training_rows = Gauge(
+        "lms_training_rows",
+        "Latest merged training dataset row count.",
+        registry=registry,
+    )
     performance_drift_detected = Gauge(
         "lms_performance_drift_detected",
         "Whether latest truth batch has performance drift.",
@@ -235,10 +245,15 @@ def render_metrics() -> tuple[bytes, str]:
         _set_gauge(classification_recall, metrics.get("recall_risk"))
         _set_gauge(classification_precision, metrics.get("precision_risk"))
         _set_gauge(false_negative_count, metrics.get("false_negative_count"))
+        _set_gauge(matched_ratio, truth.get("matched_ratio"))
         _set_gauge(performance_drift_detected, performance_drift.get("performance_drift_detected"))
         _set_gauge(retrain_decision, truth.get("retrain_decision"))
 
     if retrain:
+        training_dataset = retrain.get("training_dataset", {})
+
+        _set_gauge(batch_rows, training_dataset.get("training_rows"), {"flow": "retrain", "metric_type": "training"})
+        _set_gauge(training_rows, training_dataset.get("training_rows"))
         _set_gauge(promotion_decision, retrain.get("promotion_decision"))
 
     return generate_latest(registry), CONTENT_TYPE_LATEST

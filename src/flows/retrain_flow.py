@@ -3,6 +3,8 @@ from pathlib import Path
 
 from prefect import flow, get_run_logger
 
+from core.config import REFERENCE_DATA_PATH
+from data.retrain_dataset import build_retrain_dataset
 from monitoring.prometheus import record_retrain_metrics
 from models.registry import register_model_version, set_champion_alias
 from models.train import train_and_log_candidates
@@ -35,11 +37,16 @@ def retrain_flow(
     training_path: str,
     evaluation_path: str,
     output_path: str | None = None,
+    reference_path: str | None = None,
+    merged_training_path: str | None = None,
 ) -> dict:
     logger = get_run_logger()
 
     evaluation = _load_json(evaluation_path)
     batch_id = evaluation["batch_id"]
+    # Kept as training_path for the existing deployment/API contract.
+    # At this stage it represents the newest truth batch path.
+    truth_paths = [training_path]
 
     if output_path is None:
         output_path = f"outputs/retrain/{batch_id}.json"
@@ -48,6 +55,7 @@ def retrain_flow(
         summary = {
             "batch_id": batch_id,
             "training_path": training_path,
+            "truth_paths": truth_paths,
             "evaluation_path": evaluation_path,
             "output_path": output_path,
             "status": "skipped",
@@ -62,10 +70,22 @@ def retrain_flow(
         logger.info("Retrain skipped for batch_id=%s", batch_id)
         return summary
 
-    logger.info("Starting retrain for batch_id=%s from %s", batch_id, training_path)
+    reference_path = reference_path or str(REFERENCE_DATA_PATH)
+    training_dataset = build_retrain_dataset(
+        reference_path=reference_path,
+        truth_paths=truth_paths,
+        batch_id=batch_id,
+        output_path=merged_training_path,
+    )
+
+    logger.info(
+        "Starting retrain for batch_id=%s from merged dataset %s",
+        batch_id,
+        training_dataset["output_path"],
+    )
 
     train_result = train_and_log_candidates(
-        csv_path=training_path,
+        csv_path=training_dataset["output_path"],
         include_champion_baseline=True,
     )
 
@@ -97,7 +117,9 @@ def retrain_flow(
 
     summary = {
         "batch_id": batch_id,
-        "training_path": training_path,
+        "training_path": training_dataset["output_path"],
+        "truth_paths": truth_paths,
+        "training_dataset": training_dataset,
         "evaluation_path": evaluation_path,
         "output_path": output_path,
         "status": "completed",

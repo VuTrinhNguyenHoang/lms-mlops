@@ -32,11 +32,16 @@ def risk_level(score: float) -> str:
 LOCAL_STORAGE_DIR = PROJECT_ROOT / "storage"
 LOCAL_OUTPUT_DIR = PROJECT_ROOT / "outputs"
 LOCAL_METRICS_DIR = LOCAL_OUTPUT_DIR / "metrics"
+LOCAL_TRAINING_DIR = LOCAL_OUTPUT_DIR / "training"
+LOCAL_MERGED_TRAINING_DIR = LOCAL_TRAINING_DIR / "merged"
 
 # Prefect deployments
 PREFECT_TRAIN_DEPLOYMENT = "train-initial-champion/train-initial-champion"
 PREFECT_PREDICT_DEPLOYMENT = "predict-batch/predict-batch"
 PREFECT_TRUTH_DEPLOYMENT = "evaluate-truth/evaluate-truth"
+PREFECT_EVALUATE_AND_RETRAIN_DEPLOYMENT = (
+    "evaluate-and-maybe-retrain/evaluate-and-maybe-retrain"
+)
 PREFECT_RETRAIN_DEPLOYMENT = "retrain-model/retrain-model"
 
 # Drift

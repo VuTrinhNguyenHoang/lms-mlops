@@ -3,6 +3,7 @@ from pathlib import Path
 
 from prefect import flow, get_run_logger
 
+from core.config import LOCAL_REPORT_DIR
 from core.contracts import ID_COLUMNS
 from data.loading import load_csv
 from data.validation import validate_prediction_output_df, validate_truth_df
@@ -27,6 +28,19 @@ def _join_truth_and_predictions(truth_df, predictions_df, batch_id: str):
         raise ValueError("Truth and predictions have no matching ID rows")
 
     return joined, batch_predictions
+
+def _data_drift_summary_path(batch_id: str) -> Path:
+    return LOCAL_REPORT_DIR / "evidently" / "data_drift" / f"{batch_id}.summary.json"
+
+
+def _load_data_drift_metrics(batch_id: str) -> tuple[dict | None, str | None]:
+    path = _data_drift_summary_path(batch_id)
+
+    if not path.exists():
+        return None, None
+
+    summary = json.loads(path.read_text(encoding="utf-8"))
+    return summary.get("metrics", {}), str(path)
 
 @flow(name="evaluate-truth", log_prints=True)
 def evaluate_truth_flow(
@@ -53,6 +67,8 @@ def evaluate_truth_flow(
 
     metrics = evaluate_prediction_output(joined_df)
     performance_drift = compute_performance_drift(metrics)
+    matched_ratio = len(joined_df) / len(truth_df) if len(truth_df) else 0
+    data_drift, data_drift_summary_path = _load_data_drift_metrics(batch_id)
 
     summary = {
         "batch_id": batch_id,
@@ -62,10 +78,15 @@ def evaluate_truth_flow(
         "truth_rows": int(len(truth_df)),
         "prediction_rows": int(len(batch_predictions)),
         "matched_rows": int(len(joined_df)),
+        "matched_ratio": float(matched_ratio),
         "unmatched_truth_rows": int(len(truth_df) - len(joined_df)),
         "metrics": metrics,
         "performance_drift": performance_drift
     }
+
+    if data_drift is not None:
+        summary["data_drift"] = data_drift
+        summary["data_drift_summary_path"] = data_drift_summary_path
 
     retrain_decision, retrain_reasons = should_retrain(summary)
     summary["retrain_decision"] = retrain_decision

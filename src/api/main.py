@@ -8,9 +8,9 @@ from api.dependencies import trigger_deployment
 from core.config import (
     LOCAL_OUTPUT_DIR,
     LOCAL_STORAGE_DIR,
+    PREFECT_EVALUATE_AND_RETRAIN_DEPLOYMENT,
     PREFECT_PREDICT_DEPLOYMENT,
     PREFECT_RETRAIN_DEPLOYMENT,
-    PREFECT_TRUTH_DEPLOYMENT,
 )
 from monitoring.prometheus import render_metrics
 
@@ -82,16 +82,18 @@ async def upload_truth_batch(
     truth_path = LOCAL_STORAGE_DIR / "raw" / "truth" / f"{batch_id}.csv"
     prediction_path = LOCAL_OUTPUT_DIR / "predictions" / f"{batch_id}.csv"
     evaluation_path = LOCAL_OUTPUT_DIR / "evaluations" / f"{batch_id}.json"
+    retrain_path = LOCAL_OUTPUT_DIR / "retrain" / f"{batch_id}.json"
 
     await _save_upload(file, truth_path)
 
     flow_run_id = await trigger_deployment(
-        name=PREFECT_TRUTH_DEPLOYMENT,
+        name=PREFECT_EVALUATE_AND_RETRAIN_DEPLOYMENT,
         parameters={
             "truth_path": str(truth_path),
             "prediction_path": str(prediction_path),
             "batch_id": batch_id,
-            "output_path": str(evaluation_path),
+            "evaluation_path": str(evaluation_path),
+            "retrain_output_path": str(retrain_path),
         },
     )
 
@@ -102,6 +104,7 @@ async def upload_truth_batch(
         "truth_path": str(truth_path),
         "prediction_path": str(prediction_path),
         "evaluation_path": str(evaluation_path),
+        "retrain_path": str(retrain_path),
     }
 
 @app.post("/batches/{batch_id}/retrain", status_code=status.HTTP_202_ACCEPTED)

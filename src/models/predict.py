@@ -1,8 +1,20 @@
-from core.config import RISK_THRESHOLD, risk_level
+from core.config import RISK_THRESHOLD, risk_level, MLFLOW_REGISTERED_MODEL_NAME
 from core.contracts import ID_COLUMNS, FEATURE_COLUMNS
 from data.loading import load_csv
 from data.validation import validate_prediction_df
+from models.registry import get_champion_version, load_champion_model
 
+def predict_with_champion(csv_path: str, batch_id: str):
+    champion = load_champion_model()
+    champion_version = get_champion_version()
+
+    return predict_batch(
+        champion,
+        csv_path,
+        batch_id,
+        model_name=MLFLOW_REGISTERED_MODEL_NAME,
+        model_version=champion_version.version
+    )
 
 def predict_batch(
     model,

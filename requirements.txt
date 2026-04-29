@@ -1,0 +1,10 @@
+fastapi==0.135.1
+uvicorn[standard]==0.34.0
+python-multipart==0.0.22
+prefect==3.6.27
+mlflow==3.10.1
+evidently==0.7.21
+pandas==2.3.3
+scikit-learn==1.7.2
+prometheus-client==0.24.1
+minio==7.2.18

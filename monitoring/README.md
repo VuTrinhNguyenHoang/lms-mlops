@@ -1,41 +1,22 @@
-# Observability
+# Monitoring
 
-This folder runs a lightweight Prometheus + Grafana stack for the local LMS MLOps demo.
-
-## Run
-
-Start the API on the host so Prometheus can scrape `/metrics` from inside Docker:
+Prometheus and Grafana are part of the main Docker Compose stack.
 
 ```bash
-PYTHONPATH=src ~/venv/bin/uvicorn api.main:app --host 0.0.0.0 --port 8000
-```
-
-Start Prometheus and Grafana:
-
-```bash
-docker compose -f docker-compose.observability.yml up
+docker compose up --build
 ```
 
 Open:
 
 - Prometheus: http://localhost:9090
-- Prometheus targets: http://localhost:9090/targets
 - Grafana: http://localhost:3000
+- Grafana login: `admin / admin`
 
-Grafana default login:
-
-```text
-admin / admin
-```
-
-The dashboard is provisioned under:
+The provisioned dashboard is:
 
 ```text
 LMS MLOps / LMS MLOps Overview
 ```
 
-## Notes
-
-- Prometheus scrapes `host.docker.internal:8000/metrics`.
-- Grafana uses the Docker Compose service name `http://prometheus:9090`.
-- Runtime outputs such as `outputs/`, `storage/`, and `mlruns/` should stay out of git.
+Prometheus scrapes the API through the Docker network target `api:8000`.
+Runtime outputs stay in ignored local folders: `outputs/`, `storage/`, and Docker volumes.

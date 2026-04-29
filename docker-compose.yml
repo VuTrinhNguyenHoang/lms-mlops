@@ -1,0 +1,195 @@
+name: lms-mlops
+
+x-app-env: &app-env
+  PYTHONPATH: /app/src
+  PROJECT_ROOT: /app
+  LOCAL_STORAGE_DIR: /app/storage
+  LOCAL_OUTPUT_DIR: /app/outputs
+  REFERENCE_DATA_PATH: /app/data/reference/simulated_data.csv
+  MLFLOW_TRACKING_URI: http://mlflow:5000
+  MLFLOW_REGISTRY_URI: http://mlflow:5000
+  MLFLOW_EXPERIMENT_NAME: lms-dropout-risk
+  MLFLOW_REGISTERED_MODEL_NAME: lms-dropout-risk-model
+  MLFLOW_CHAMPION_ALIAS: champion
+  PREFECT_API_URL: http://prefect-server:4200/api
+  MLFLOW_ALLOW_PICKLE_DESERIALIZATION: "true"
+  GIT_PYTHON_REFRESH: quiet
+  STORAGE_BACKEND: minio
+  MINIO_ENDPOINT: minio:9000
+  MINIO_ACCESS_KEY: minioadmin
+  MINIO_SECRET_KEY: minioadmin
+  MINIO_BUCKET: lms-mlops
+  MINIO_SECURE: "false"
+  RISK_THRESHOLD: "0.5"
+  DATA_DRIFT_SHARE_THRESHOLD: "0.5"
+  PREDICTION_SCORE_DRIFT_THRESHOLD: "0.05"
+
+x-app-volumes: &app-volumes
+  - ./storage:/app/storage
+  - ./outputs:/app/outputs
+  - ./data:/app/data:ro
+
+services:
+  minio:
+    image: minio/minio:latest
+    command:
+      - server
+      - /data
+      - --console-address
+      - ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio-data:/data
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        until mc alias set local http://minio:9000 minioadmin minioadmin; do
+          sleep 2
+        done
+        mc mb --ignore-existing local/lms-mlops
+
+  mlflow:
+    build: .
+    command:
+      - mlflow
+      - server
+      - --host
+      - 0.0.0.0
+      - --port
+      - "5000"
+      - --backend-store-uri
+      - sqlite:////mlflow/mlflow.db
+      - --default-artifact-root
+      - /mlflow/artifacts
+    ports:
+      - "5000:5000"
+    environment:
+      MLFLOW_SERVER_ALLOWED_HOSTS: mlflow,mlflow:5000,localhost,localhost:5000,127.0.0.1,127.0.0.1:5000
+    volumes:
+      - mlflow-data:/mlflow
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import socket; s=socket.create_connection(('localhost', 5000), 2); s.close()"
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  prefect-server:
+    build: .
+    command:
+      - prefect
+      - server
+      - start
+      - --host
+      - 0.0.0.0
+    environment:
+      PREFECT_UI_URL: http://localhost:4200
+      PREFECT_UI_API_URL: http://localhost:4200/api
+      PREFECT_API_URL: http://prefect-server:4200/api
+      PREFECT_SERVER_API_HOST: 0.0.0.0
+    ports:
+      - "4200:4200"
+    volumes:
+      - prefect-data:/root/.prefect
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import socket; s=socket.create_connection(('localhost', 4200), 2); s.close()"
+      interval: 10s
+      timeout: 5s
+      retries: 18
+
+  prefect-flows:
+    build: .
+    command:
+      - python
+      - -m
+      - flows.serve
+    environment:
+      <<: *app-env
+    volumes: *app-volumes
+    depends_on:
+      minio-init:
+        condition: service_completed_successfully
+      mlflow:
+        condition: service_healthy
+      prefect-server:
+        condition: service_healthy
+
+  api:
+    build: .
+    environment:
+      <<: *app-env
+    ports:
+      - "8000:8000"
+    volumes: *app-volumes
+    depends_on:
+      minio-init:
+        condition: service_completed_successfully
+      mlflow:
+        condition: service_healthy
+      prefect-server:
+        condition: service_healthy
+      prefect-flows:
+        condition: service_started
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2).read()"
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  prometheus:
+    image: prom/prometheus:latest
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    depends_on:
+      api:
+        condition: service_healthy
+
+  grafana:
+    image: grafana/grafana-oss:latest
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/etc/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+
+volumes:
+  minio-data:
+  mlflow-data:
+  prefect-data:
+  prometheus-data:
+  grafana-data:

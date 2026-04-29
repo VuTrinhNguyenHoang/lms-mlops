@@ -7,10 +7,15 @@ from data.loading import save_csv, load_csv
 from drift.data_drift import compute_data_drift
 from monitoring.prometheus import record_prediction_metrics
 from models.predict import predict_with_champion
+from storage.artifacts import compact_artifact_map, mirror_file_to_object_store
 from storage.paths import (
+    data_drift_html_key,
     data_drift_html_path,
+    data_drift_json_key,
     data_drift_json_path,
+    data_drift_summary_key,
     data_drift_summary_path,
+    prediction_output_key,
     prediction_output_path,
 )
 
@@ -35,6 +40,11 @@ def predict_batch_flow(
     )
 
     save_csv(predictions, output_path)
+    prediction_object = mirror_file_to_object_store(
+        output_path,
+        prediction_output_key(batch_id),
+        content_type="text/csv",
+    )
 
     reference_df = load_csv(REFERENCE_DATA_PATH)
     current_df = load_csv(input_path)
@@ -56,6 +66,16 @@ def predict_batch_flow(
         html_path=str(drift_html_path),
         json_path=str(drift_json_path),
     )
+    drift_html_object = mirror_file_to_object_store(
+        drift_html_path,
+        data_drift_html_key(batch_id),
+        content_type="text/html",
+    )
+    drift_json_object = mirror_file_to_object_store(
+        drift_json_path,
+        data_drift_json_key(batch_id),
+        content_type="application/json",
+    )
 
     drift_summary_path.parent.mkdir(parents=True, exist_ok=True)
     drift_summary_path.write_text(
@@ -71,6 +91,11 @@ def predict_batch_flow(
             indent=2,
         ),
         encoding="utf-8",
+    )
+    drift_summary_object = mirror_file_to_object_store(
+        drift_summary_path,
+        data_drift_summary_key(batch_id),
+        content_type="application/json",
     )
 
     model_version = str(predictions["model_version"].iloc[0])
@@ -93,6 +118,14 @@ def predict_batch_flow(
         "drift_json_path": str(drift_json_path),
         "drift_summary_path": str(drift_summary_path),
         "drift_metrics": drift_metrics,
+        "object_store": compact_artifact_map(
+            {
+                "prediction_output": prediction_object,
+                "data_drift_html": drift_html_object,
+                "data_drift_json": drift_json_object,
+                "data_drift_summary": drift_summary_object,
+            }
+        ),
     }
 
     record_prediction_metrics(summary)
@@ -102,7 +135,7 @@ def predict_batch_flow(
 if __name__ == "__main__":
     print(
         predict_batch_flow(
-            input_path="simulated_data.csv",
+            input_path=str(REFERENCE_DATA_PATH),
             batch_id="demo-batch",
         )
     )

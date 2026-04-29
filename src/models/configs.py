@@ -8,6 +8,7 @@ MODELS = {
             "max_iter": 1000,
             "class_weight": "balanced",
         },
+        "scale": True,
     },
     "random_forest": {
         "estimator": RandomForestClassifier,

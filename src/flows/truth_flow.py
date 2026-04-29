@@ -3,6 +3,7 @@ from pathlib import Path
 
 from prefect import flow, get_run_logger
 
+from core.config import REFERENCE_DATA_PATH
 from core.contracts import ID_COLUMNS
 from data.loading import load_csv
 from data.validation import validate_prediction_output_df, validate_truth_df
@@ -10,8 +11,10 @@ from models.evaluate import evaluate_prediction_output
 from monitoring.prometheus import record_truth_metrics
 from rules.retrain import should_retrain
 from drift.performance_drift import compute_performance_drift
+from storage.artifacts import compact_artifact_map, mirror_file_to_object_store
 from storage.paths import (
     data_drift_summary_path,
+    evaluation_output_key,
     evaluation_output_path,
     prediction_output_path,
 )
@@ -81,7 +84,7 @@ def evaluate_truth_flow(
         "matched_ratio": float(matched_ratio),
         "unmatched_truth_rows": int(len(truth_df) - len(joined_df)),
         "metrics": metrics,
-        "performance_drift": performance_drift
+        "performance_drift": performance_drift,
     }
 
     if data_drift is not None:
@@ -97,6 +100,27 @@ def evaluate_truth_flow(
         json.dumps(summary, indent=2),
         encoding="utf-8",
     )
+
+    evaluation_object = mirror_file_to_object_store(
+        output_path,
+        evaluation_output_key(batch_id),
+        content_type="application/json",
+    )
+    summary["object_store"] = compact_artifact_map(
+        {
+            "evaluation": evaluation_object,
+        }
+    )
+    Path(output_path).write_text(
+        json.dumps(summary, indent=2),
+        encoding="utf-8",
+    )
+    if evaluation_object is not None:
+        mirror_file_to_object_store(
+            output_path,
+            evaluation_output_key(batch_id),
+            content_type="application/json",
+        )
     record_truth_metrics(summary)
 
     logger.info(
@@ -112,7 +136,7 @@ def evaluate_truth_flow(
 if __name__ == "__main__":
     print(
         evaluate_truth_flow(
-            truth_path="simulated_data.csv",
+            truth_path=str(REFERENCE_DATA_PATH),
             prediction_path=str(prediction_output_path("demo-batch")),
             batch_id="demo-batch",
         )

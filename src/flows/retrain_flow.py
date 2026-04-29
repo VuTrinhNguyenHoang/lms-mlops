@@ -9,9 +9,12 @@ from monitoring.prometheus import record_retrain_metrics
 from models.registry import register_model_version, set_champion_alias
 from models.train import train_and_log_candidates
 from rules.promotion import should_promote
+from storage.artifacts import compact_artifact_map, mirror_file_to_object_store
 from storage.paths import (
     evaluation_output_path,
+    merged_training_dataset_key,
     merged_training_dataset_path,
+    retrain_output_key,
     retrain_output_path,
 )
 
@@ -71,6 +74,23 @@ def retrain_flow(
         }
 
         _write_json(summary, output_path)
+        retrain_object = mirror_file_to_object_store(
+            output_path,
+            retrain_output_key(batch_id),
+            content_type="application/json",
+        )
+        summary["object_store"] = compact_artifact_map(
+            {
+                "retrain_decision": retrain_object,
+            }
+        )
+        _write_json(summary, output_path)
+        if retrain_object is not None:
+            mirror_file_to_object_store(
+                output_path,
+                retrain_output_key(batch_id),
+                content_type="application/json",
+            )
         record_retrain_metrics(summary)
         logger.info("Retrain skipped for batch_id=%s", batch_id)
         return summary
@@ -84,6 +104,11 @@ def retrain_flow(
         truth_paths=truth_paths,
         batch_id=batch_id,
         output_path=merged_training_path,
+    )
+    merged_training_object = mirror_file_to_object_store(
+        training_dataset["output_path"],
+        merged_training_dataset_key(batch_id),
+        content_type="text/csv",
     )
 
     logger.info(
@@ -143,16 +168,39 @@ def retrain_flow(
         "registered_model_name": registered_model_name,
         "model_version": model_version,
         "champion_alias": "champion" if promotion_decision else None,
+        "object_store": compact_artifact_map(
+            {
+                "merged_training_dataset": merged_training_object,
+            }
+        ),
     }
 
     _write_json(summary, output_path)
+    retrain_object = mirror_file_to_object_store(
+        output_path,
+        retrain_output_key(batch_id),
+        content_type="application/json",
+    )
+    summary["object_store"] = compact_artifact_map(
+        {
+            **summary["object_store"],
+            "retrain_decision": retrain_object,
+        }
+    )
+    _write_json(summary, output_path)
+    if retrain_object is not None:
+        mirror_file_to_object_store(
+            output_path,
+            retrain_output_key(batch_id),
+            content_type="application/json",
+        )
     record_retrain_metrics(summary)
     return summary
 
 if __name__ == "__main__":
     print(
         retrain_flow(
-            training_path="simulated_data.csv",
+            training_path=str(REFERENCE_DATA_PATH),
             evaluation_path=str(evaluation_output_path("demo-batch")),
         )
     )

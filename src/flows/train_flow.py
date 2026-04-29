@@ -1,5 +1,6 @@
 from prefect import flow, get_run_logger
 
+from core.config import REFERENCE_DATA_PATH
 from models.train import train_and_register_champion
 
 def _summarize_training_result(result: dict) -> dict:
@@ -37,4 +38,4 @@ def train_initial_champion_flow(csv_path: str) -> dict:
     return summary
 
 if __name__ == "__main__":
-    print(train_initial_champion_flow("simulated_data.csv"))
+    print(train_initial_champion_flow(str(REFERENCE_DATA_PATH)))

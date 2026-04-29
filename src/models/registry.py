@@ -24,11 +24,16 @@ def log_candidate_run(model_name: str, model, metrics: dict, params: dict, X_sam
 
     input_example = X_sample.head(5)
     signature = infer_signature(input_example, model.predict_proba(input_example))
+    loggable_metrics = {
+        key: value
+        for key, value in metrics.items()
+        if value is not None
+    }
 
     with mlflow.start_run(run_name=f"train-{model_name}") as run:
         mlflow.log_param("model_name", model_name)
         mlflow.log_params(params)
-        mlflow.log_metrics(metrics)
+        mlflow.log_metrics(loggable_metrics)
 
         mlflow.set_tags(
             {

@@ -28,6 +28,7 @@ x-app-volumes: &app-volumes
   - ./storage:/app/storage
   - ./outputs:/app/outputs
   - ./data:/app/data:ro
+  - mlflow-data:/mlflow
 
 services:
   minio:
@@ -186,6 +187,17 @@ services:
       - grafana-data:/var/lib/grafana
     depends_on:
       - prometheus
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: http://localhost:8000
+    ports:
+      - "5173:80"
+    depends_on:
+      api:
+        condition: service_healthy
 
 volumes:
   minio-data:

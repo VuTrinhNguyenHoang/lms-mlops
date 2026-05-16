@@ -181,6 +181,7 @@ docker compose ps
 Các service chính cần ở trạng thái `Up`:
 
 - `api`
+- `frontend`
 - `prefect-server`
 - `prefect-flows`
 - `mlflow`
@@ -199,6 +200,14 @@ Kết quả mong đợi:
 ```json
 {"status":"ok"}
 ```
+
+Mở React user portal:
+
+```text
+http://localhost:5173
+```
+
+Portal này là giao diện nghiệp vụ cho người dùng cuối: upload prediction CSV, xem batch history, xem prediction result, upload truth và xem evaluation summary. Các UI như Prefect, MLflow và Grafana vẫn là giao diện vận hành nội bộ.
 
 ### 3. Bootstrap champion model
 
@@ -320,6 +329,7 @@ Kỳ vọng:
 
 | UI | URL | Ghi chú |
 |---|---|---|
+| React User Portal | http://localhost:5173 | Giao diện nghiệp vụ cho upload prediction, xem kết quả, upload truth, evaluation và history. |
 | FastAPI Swagger | http://localhost:8000/docs | Test endpoint trực tiếp. |
 | Prefect | http://localhost:4200 | Xem deployments và flow runs. |
 | MLflow | http://localhost:5000 | Xem experiments, runs, model registry. |

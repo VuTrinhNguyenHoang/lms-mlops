@@ -15,6 +15,27 @@ PREDICTION_BATCH_PATH = PROJECT_ROOT / "data" / "demo" / "prediction_batch.csv"
 TRUTH_BATCH_PATH = PROJECT_ROOT / "data" / "demo" / "truth_batch.csv"
 DRIFTED_PREDICTION_BATCH_PATH = PROJECT_ROOT / "data" / "demo" / "drifted_prediction_batch.csv"
 DRIFTED_TRUTH_BATCH_PATH = PROJECT_ROOT / "data" / "demo" / "drifted_truth_batch.csv"
+PERFORMANCE_DRIFT_TRUTH_BATCH_PATH = (
+    PROJECT_ROOT / "data" / "demo" / "performance_drift_truth_batch.csv"
+)
+CS101_WEEK07_PREDICTION_PATH = (
+    PROJECT_ROOT / "data" / "demo" / "spring_2026_cs101_week07_prediction.csv"
+)
+CS101_WEEK07_TRUTH_PATH = (
+    PROJECT_ROOT / "data" / "demo" / "spring_2026_cs101_week07_truth.csv"
+)
+CS101_WEEK08_PREDICTION_PATH = (
+    PROJECT_ROOT / "data" / "demo" / "spring_2026_cs101_week08_prediction.csv"
+)
+CS101_WEEK08_POLICY_SHIFT_TRUTH_PATH = (
+    PROJECT_ROOT / "data" / "demo" / "spring_2026_cs101_week08_policy_shift_truth.csv"
+)
+CS101_WEEK09_ENGAGEMENT_DROP_PREDICTION_PATH = (
+    PROJECT_ROOT / "data" / "demo" / "spring_2026_cs101_week09_engagement_drop_prediction.csv"
+)
+CS101_WEEK09_ENGAGEMENT_DROP_TRUTH_PATH = (
+    PROJECT_ROOT / "data" / "demo" / "spring_2026_cs101_week09_engagement_drop_truth.csv"
+)
 
 
 def _student_row(student_id: int, rng: random.Random, drift: bool = False) -> dict:
@@ -75,6 +96,26 @@ def _write_csv(path: Path, rows: list[dict], columns: list[str]) -> None:
         writer.writerows({column: row[column] for column in columns} for row in rows)
 
 
+def _performance_drift_row(row: dict) -> dict:
+    shifted = dict(row)
+    absence_columns = [f"absrate{term}" for term in range(1, 8)]
+    mark_columns = [
+        f"q{quiz}mpa{term}"
+        for term in range(1, 8)
+        for quiz in range(1, 5)
+    ]
+
+    avg_absence = sum(float(row[column]) for column in absence_columns) / len(
+        absence_columns
+    )
+    avg_mark = sum(float(row[column]) for column in mark_columns) / len(mark_columns)
+
+    # Concept/performance-drift scenario: a stricter course policy makes borderline
+    # attendance and marks fail more often even though the input distribution is normal.
+    shifted[TARGET_COLUMN] = 1 if avg_mark < 65 or avg_absence > 0.28 else 0
+    return shifted
+
+
 def main() -> None:
     rng = random.Random(42)
     truth_columns = ID_COLUMNS + FEATURE_COLUMNS + [TARGET_COLUMN]
@@ -83,18 +124,55 @@ def main() -> None:
     reference_rows = [_student_row(student_id, rng) for student_id in range(1, 221)]
     truth_rows = [_student_row(student_id, rng) for student_id in range(221, 281)]
     drifted_rows = [_student_row(student_id, rng, drift=True) for student_id in range(281, 341)]
+    performance_drift_truth_rows = [_performance_drift_row(row) for row in truth_rows]
 
     _write_csv(REFERENCE_PATH, reference_rows, truth_columns)
     _write_csv(PREDICTION_BATCH_PATH, truth_rows, prediction_columns)
     _write_csv(TRUTH_BATCH_PATH, truth_rows, truth_columns)
     _write_csv(DRIFTED_PREDICTION_BATCH_PATH, drifted_rows, prediction_columns)
     _write_csv(DRIFTED_TRUTH_BATCH_PATH, drifted_rows, truth_columns)
+    _write_csv(
+        PERFORMANCE_DRIFT_TRUTH_BATCH_PATH,
+        performance_drift_truth_rows,
+        truth_columns,
+    )
+
+    _write_csv(CS101_WEEK07_PREDICTION_PATH, truth_rows, prediction_columns)
+    _write_csv(CS101_WEEK07_TRUTH_PATH, truth_rows, truth_columns)
+    _write_csv(CS101_WEEK08_PREDICTION_PATH, truth_rows, prediction_columns)
+    _write_csv(
+        CS101_WEEK08_POLICY_SHIFT_TRUTH_PATH,
+        performance_drift_truth_rows,
+        truth_columns,
+    )
+    _write_csv(
+        CS101_WEEK09_ENGAGEMENT_DROP_PREDICTION_PATH,
+        drifted_rows,
+        prediction_columns,
+    )
+    _write_csv(CS101_WEEK09_ENGAGEMENT_DROP_TRUTH_PATH, drifted_rows, truth_columns)
 
     print(f"Wrote {len(reference_rows)} rows to {REFERENCE_PATH}")
     print(f"Wrote {len(truth_rows)} rows to {PREDICTION_BATCH_PATH}")
     print(f"Wrote {len(truth_rows)} rows to {TRUTH_BATCH_PATH}")
     print(f"Wrote {len(drifted_rows)} rows to {DRIFTED_PREDICTION_BATCH_PATH}")
     print(f"Wrote {len(drifted_rows)} rows to {DRIFTED_TRUTH_BATCH_PATH}")
+    print(
+        f"Wrote {len(performance_drift_truth_rows)} rows to "
+        f"{PERFORMANCE_DRIFT_TRUTH_BATCH_PATH}"
+    )
+    print(f"Wrote {len(truth_rows)} rows to {CS101_WEEK07_PREDICTION_PATH}")
+    print(f"Wrote {len(truth_rows)} rows to {CS101_WEEK07_TRUTH_PATH}")
+    print(f"Wrote {len(truth_rows)} rows to {CS101_WEEK08_PREDICTION_PATH}")
+    print(
+        f"Wrote {len(performance_drift_truth_rows)} rows to "
+        f"{CS101_WEEK08_POLICY_SHIFT_TRUTH_PATH}"
+    )
+    print(
+        f"Wrote {len(drifted_rows)} rows to "
+        f"{CS101_WEEK09_ENGAGEMENT_DROP_PREDICTION_PATH}"
+    )
+    print(f"Wrote {len(drifted_rows)} rows to {CS101_WEEK09_ENGAGEMENT_DROP_TRUTH_PATH}")
 
 
 if __name__ == "__main__":

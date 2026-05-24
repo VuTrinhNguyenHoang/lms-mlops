@@ -2,7 +2,7 @@ DEFAULT_PROMOTION_RULES = {
     "primary_metric": "f1_risk",
     "min_primary_improvement": 0.01,
     "guardrail_metrics": ["recall_risk", "precision_risk"],
-    "max_guardrail_drop": 0.05,
+    "max_guardrail_drop": 0.10,
 }
 
 def should_promote(

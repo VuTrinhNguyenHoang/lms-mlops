@@ -60,8 +60,16 @@ Trong hệ thống hiện tại:
 - Reference training data: `data/reference/simulated_data.csv`
 - Prediction batch thường: `data/demo/prediction_batch.csv`
 - Truth batch thường: `data/demo/truth_batch.csv`
+- Truth batch performance drift: `data/demo/performance_drift_truth_batch.csv`
 - Prediction batch có drift: `data/demo/drifted_prediction_batch.csv`
 - Truth batch có drift: `data/demo/drifted_truth_batch.csv`
+- Demo theo học kỳ:
+  - `data/demo/spring_2026_cs101_week07_prediction.csv`
+  - `data/demo/spring_2026_cs101_week07_truth.csv`
+  - `data/demo/spring_2026_cs101_week08_prediction.csv`
+  - `data/demo/spring_2026_cs101_week08_policy_shift_truth.csv`
+  - `data/demo/spring_2026_cs101_week09_engagement_drop_prediction.csv`
+  - `data/demo/spring_2026_cs101_week09_engagement_drop_truth.csv`
 
 ## Cấu Trúc Thư Mục
 
@@ -239,14 +247,14 @@ Lưu ý: `docker compose up -d --build` chỉ khởi động các service hạ t
 
 ```bash
 curl -X POST http://localhost:8000/batches/prediction \
-  -F "batch_id=demo-001" \
-  -F "file=@data/demo/prediction_batch.csv"
+  -F "batch_id=spring-2026-cs101-week07" \
+  -F "file=@data/demo/spring_2026_cs101_week07_prediction.csv"
 ```
 
 Kiểm tra status:
 
 ```bash
-curl http://localhost:8000/batches/demo-001
+curl http://localhost:8000/batches/spring-2026-cs101-week07
 ```
 
 Kỳ vọng:
@@ -258,27 +266,27 @@ Kỳ vọng:
 Xem prediction output:
 
 ```bash
-curl http://localhost:8000/batches/demo-001/predictions
+curl http://localhost:8000/batches/spring-2026-cs101-week07/predictions
 ```
 
 Mở drift report:
 
 ```text
-http://localhost:8000/batches/demo-001/drift-report
+http://localhost:8000/batches/spring-2026-cs101-week07/drift-report
 ```
 
 ### 5. Upload truth batch bình thường
 
 ```bash
 curl -X POST http://localhost:8000/batches/truth \
-  -F "batch_id=demo-001" \
-  -F "file=@data/demo/truth_batch.csv"
+  -F "batch_id=spring-2026-cs101-week07" \
+  -F "file=@data/demo/spring_2026_cs101_week07_truth.csv"
 ```
 
 Xem evaluation:
 
 ```bash
-curl http://localhost:8000/batches/demo-001/evaluation
+curl http://localhost:8000/batches/spring-2026-cs101-week07/evaluation
 ```
 
 Kỳ vọng:
@@ -293,28 +301,28 @@ Prediction drifted batch:
 
 ```bash
 curl -X POST http://localhost:8000/batches/prediction \
-  -F "batch_id=drift-001" \
-  -F "file=@data/demo/drifted_prediction_batch.csv"
+  -F "batch_id=spring-2026-cs101-week09-engagement" \
+  -F "file=@data/demo/spring_2026_cs101_week09_engagement_drop_prediction.csv"
 ```
 
 Truth drifted batch:
 
 ```bash
 curl -X POST http://localhost:8000/batches/truth \
-  -F "batch_id=drift-001" \
-  -F "file=@data/demo/drifted_truth_batch.csv"
+  -F "batch_id=spring-2026-cs101-week09-engagement" \
+  -F "file=@data/demo/spring_2026_cs101_week09_engagement_drop_truth.csv"
 ```
 
 Kiểm tra evaluation:
 
 ```bash
-curl http://localhost:8000/batches/drift-001/evaluation
+curl http://localhost:8000/batches/spring-2026-cs101-week09-engagement/evaluation
 ```
 
 Kiểm tra retrain:
 
 ```bash
-curl http://localhost:8000/batches/drift-001/retrain
+curl http://localhost:8000/batches/spring-2026-cs101-week09-engagement/retrain
 ```
 
 Kỳ vọng:
@@ -382,12 +390,8 @@ GET  /batches/{batch_id}/retrain
 - [x] Prometheus metrics endpoint `/metrics`.
 - [x] Grafana dashboard provisioning.
 - [x] Docker Compose stack cho API, Prefect, MLflow, MinIO, Prometheus, Grafana.
-- [ ] Test suite tự động cho API, flows, rules và data validation.
 - [ ] CI pipeline.
-- [ ] Batch/job metadata database.
-- [ ] Query trạng thái flow run trực tiếp từ Prefect API trong endpoint status.
 - [ ] Baseline performance drift theo champion history thay vì threshold tĩnh.
-- [ ] Retrain từ 2-3 truth batches gần nhất.
+- [x] Retrain từ 2-3 truth batches gần nhất.
 - [ ] Authentication/authorization cho API và dashboards.
-- [ ] Data validation sâu hơn cho dtype/range/missing values.
 - [ ] Alerting rules cho Grafana/Prometheus.

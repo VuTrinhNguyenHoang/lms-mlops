@@ -8,6 +8,7 @@ from drift.data_drift import compute_data_drift
 from monitoring.prometheus import record_prediction_metrics
 from models.predict import predict_with_champion
 from storage.artifacts import compact_artifact_map, mirror_file_to_object_store
+from storage.truth_batches import latest_truth_path
 from storage.paths import (
     data_drift_html_key,
     data_drift_html_path,
@@ -18,6 +19,13 @@ from storage.paths import (
     prediction_output_key,
     prediction_output_path,
 )
+
+
+def _select_drift_reference(batch_id: str) -> tuple[str, str]:
+    truth_reference = latest_truth_path(exclude_batch_id=batch_id)
+    if truth_reference is not None:
+        return str(truth_reference), "latest_truth_batch"
+    return str(REFERENCE_DATA_PATH), "bootstrap_reference"
 
 @flow(name="predict-batch", log_prints=True)
 def predict_batch_flow(
@@ -46,11 +54,12 @@ def predict_batch_flow(
         content_type="text/csv",
     )
 
-    reference_df = load_csv(REFERENCE_DATA_PATH)
+    reference_path, reference_source = _select_drift_reference(batch_id)
+    reference_df = load_csv(reference_path)
     current_df = load_csv(input_path)
 
     reference_predictions = predict_with_champion(
-        csv_path=str(REFERENCE_DATA_PATH),
+        csv_path=reference_path,
         batch_id=f"{batch_id}-reference",
     )
 
@@ -83,7 +92,8 @@ def predict_batch_flow(
             {
                 "batch_id": batch_id,
                 "input_path": input_path,
-                "reference_path": str(REFERENCE_DATA_PATH),
+                "reference_path": reference_path,
+                "reference_source": reference_source,
                 "drift_html_path": str(drift_html_path),
                 "drift_json_path": str(drift_json_path),
                 "metrics": drift_metrics,
@@ -117,6 +127,8 @@ def predict_batch_flow(
         "drift_html_path": str(drift_html_path),
         "drift_json_path": str(drift_json_path),
         "drift_summary_path": str(drift_summary_path),
+        "reference_path": reference_path,
+        "reference_source": reference_source,
         "drift_metrics": drift_metrics,
         "object_store": compact_artifact_map(
             {

@@ -3,13 +3,14 @@ from pathlib import Path
 
 from prefect import flow, get_run_logger
 
-from core.config import REFERENCE_DATA_PATH
+from core.config import RETRAIN_RECENT_TRUTH_BATCH_LIMIT
 from data.retrain_dataset import build_retrain_dataset
 from monitoring.prometheus import record_retrain_metrics
 from models.registry import register_model_version, set_champion_alias
 from models.train import train_and_log_candidates
 from rules.promotion import should_promote
 from storage.artifacts import compact_artifact_map, mirror_file_to_object_store
+from storage.truth_batches import recent_truth_paths
 from storage.paths import (
     evaluation_output_path,
     merged_training_dataset_key,
@@ -54,7 +55,13 @@ def retrain_flow(
     batch_id = evaluation["batch_id"]
     # Kept as training_path for the existing deployment/API contract.
     # At this stage it represents the newest truth batch path.
-    truth_paths = [training_path]
+    truth_paths = [
+        str(path)
+        for path in recent_truth_paths(
+            max_batches=RETRAIN_RECENT_TRUTH_BATCH_LIMIT,
+            required_path=training_path,
+        )
+    ]
 
     if output_path is None:
         output_path = str(retrain_output_path(batch_id))
@@ -64,6 +71,7 @@ def retrain_flow(
             "batch_id": batch_id,
             "training_path": training_path,
             "truth_paths": truth_paths,
+            "retrain_data_strategy": "recent_truth_batches",
             "evaluation_path": evaluation_path,
             "output_path": output_path,
             "status": "skipped",
@@ -95,7 +103,11 @@ def retrain_flow(
         logger.info("Retrain skipped for batch_id=%s", batch_id)
         return summary
 
-    reference_path = reference_path or str(REFERENCE_DATA_PATH)
+    retrain_data_strategy = (
+        "override_reference_plus_recent_truth_batches"
+        if reference_path
+        else "recent_truth_batches"
+    )
     merged_training_path = merged_training_path or str(
         merged_training_dataset_path(batch_id)
     )
@@ -152,6 +164,7 @@ def retrain_flow(
         "batch_id": batch_id,
         "training_path": training_dataset["output_path"],
         "truth_paths": truth_paths,
+        "retrain_data_strategy": retrain_data_strategy,
         "training_dataset": training_dataset,
         "evaluation_path": evaluation_path,
         "output_path": output_path,

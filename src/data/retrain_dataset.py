@@ -12,7 +12,7 @@ def _load_validated_truth(path: str):
 
 
 def build_retrain_dataset(
-    reference_path: str,
+    reference_path: str | None,
     truth_paths: list[str],
     batch_id: str,
     output_path: str,
@@ -20,14 +20,12 @@ def build_retrain_dataset(
     if not truth_paths:
         raise ValueError("At least one truth path is required to build retrain dataset")
 
-    reference_df = _load_validated_truth(reference_path)
+    reference_df = _load_validated_truth(reference_path) if reference_path else None
     truth_dfs = [_load_validated_truth(path) for path in truth_paths]
     truth_df = pd.concat(truth_dfs, ignore_index=True)
 
-    merged_df = pd.concat(
-        [reference_df, truth_df],
-        ignore_index=True,
-    )
+    datasets = [truth_df] if reference_df is None else [reference_df, truth_df]
+    merged_df = pd.concat(datasets, ignore_index=True)
     rows_before_dedup = len(merged_df)
     merged_df = (
         merged_df[TRUTH_REQUIRED_COLUMNS]
@@ -41,10 +39,10 @@ def build_retrain_dataset(
 
     return {
         "batch_id": batch_id,
-        "reference_path": str(reference_path),
+        "reference_path": str(reference_path) if reference_path else None,
         "truth_paths": [str(path) for path in truth_paths],
         "output_path": str(output_file),
-        "reference_rows": int(len(reference_df)),
+        "reference_rows": int(len(reference_df)) if reference_df is not None else 0,
         "truth_rows": int(len(truth_df)),
         "rows_before_dedup": int(rows_before_dedup),
         "training_rows": int(len(merged_df)),
